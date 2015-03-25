@@ -3,6 +3,13 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>       /* sqrt */
+#include <map>
+//*****************************************************
+//CODE BY: JOHN LUCAS
+//USC ID: 5194054637
+//For CSCI360 Artificial Intelligence, USC Spring 2015
+//*****************************************************
+
 using namespace std;
 
 enum Status {UNSOLVED, SOLVED, CONTRADICTION};
@@ -59,6 +66,26 @@ struct Puzzle {
 		evidence.clear();
 		status=UNSOLVED;
 	}
+
+	void operator-(Cell c)//remove cell from evidence
+	{
+
+		for (int i = 0; i < evidence.size(); i++)
+		{
+			if (evidence[i] == c)
+			{
+				evidence.erase(evidence.begin() + i);
+			}
+		}
+		for (int i = 0; i < disjunction.size(); i++)
+		{
+			if (disjunction[i].size() == 0)
+			{
+				if (disjunction[i][0] == c)
+					disjunction.erase(disjunction.begin() + i);
+			}
+		}
+	}
 };
 
 //helpers
@@ -80,10 +107,10 @@ struct Puzzle {
 
 vector<Cell> generateNegFacts(Cell c, int n, vector<vector<Cell> > chains)
 {
-	cout << "genNeg for :" << c;
+	//cout << "genNeg for :" << c;
 	vector<Cell> negFacts = vector<Cell>();
 	c.chain = -1;//no chain specified yet
-	for (int i = 0; i < n; i++)//every one in same row
+	for (int i = 1; i <= n; i++)//every one in same row
 	{
 		if (i != c.i)
 		{
@@ -93,7 +120,7 @@ vector<Cell> generateNegFacts(Cell c, int n, vector<vector<Cell> > chains)
 	}
 
 
-	for (int j = 0; j < n; j++)//for each in same col
+	for (int j = 1; j <= n; j++)//for each in same col
 	{
 		if (j != c.j)
 		{
@@ -102,7 +129,7 @@ vector<Cell> generateNegFacts(Cell c, int n, vector<vector<Cell> > chains)
 		}
 	}
 
-	for (int k = 0; k < n; k++)//this cell can contain nothing other than k
+	for (int k = 1; k <= n; k++)//this cell can contain nothing other than k
 	{
 		if (k != c.k)
 		{
@@ -128,23 +155,30 @@ vector<Cell> generateNegFacts(Cell c, int n, vector<vector<Cell> > chains)
 		}
 	}
 
-	
-
 	//now, we know what chain c is in
 	///go through each location, and create neg fact that their k can value c.k
 	for (int h = 0; h < n; h++)
 	{
-		Cell negCell = Cell(chains[c.chain][h].i, chains[c.chain][h].j, c.k);
+		Cell negCell = Cell(chains[c.chain][h].i, chains[c.chain][h].j, c.k); //seg fault here
+
 		if (!c.locEquals(negCell))
 		{
 			negFacts.push_back(negCell);
 		}
 	}
+
+
 	//cout << negFacts.size() << endl;
-	if (negFacts.size() >(n*n))
+	if (negFacts.size() > (4*(n-1)))
 	{
-		cout << "BAD, too many negs" << endl << endl;
+		//cout << "BAD, too many negs" << endl << endl;
 	}
+	//cout << "NSIZE: " << negFacts.size() << endl;
+	//for (int i = 0; i < negFacts.size(); i++)
+	//{
+		//cout << negFacts[i];
+
+	//}
 	return negFacts;
 }
 
@@ -171,12 +205,8 @@ Puzzle resolveStrimko(Puzzle &puzzle) {
 	//initialize old with initial facts
 	vector<Cell> oldVec = vector<Cell>();
 	oldVec = facts;
-	//
-
-	cout << facts.size() << " " << disjuncts.size() << endl;
 	int nSquared = disjuncts.size() / 4;
 	int n = sqrt(nSquared);
-	cout << "N: " << n << endl;
 
 	//we need to get chain locations from last n disjuncts in disjuncts
 	vector<vector<Cell> > chains = vector<vector<Cell> >();
@@ -185,25 +215,20 @@ Puzzle resolveStrimko(Puzzle &puzzle) {
 		chains.push_back(disjuncts[i]);
 		//for each cell in this chain, update its chain number to i, later
 	}
-	cout << "num chains " << chains.size() << endl;
 
 	while (facts.size() < nSquared)
 	{
-		cout << "current facts: " << facts.size() << endl;
-		//newSet = null;
 		vector<Cell> newVec= vector<Cell>();
 		newVec.clear();
-		//
-
-
 		//for all c in old
 		for (int j = 0; j < oldVec.size(); j++)
 		{
 			//C = negative facts for empty cells in row i, col j, and chain ij**
 			vector<Cell> negFacts = vector<Cell>(); //C
 			negFacts.clear();
+
 			negFacts = generateNegFacts(oldVec[j], n, chains);
-			//
+
 			for (int i = 0; i < disjuncts.size(); i++)
 			{
 				//each disjunct[i] that matches a negFact, remove that negFact from disjunct[i]
@@ -212,62 +237,255 @@ Puzzle resolveStrimko(Puzzle &puzzle) {
 					int idx = vecContainsCell(disjuncts[i], negFacts[x]);
 					if (idx != -1)
 					{
-						//remove negfacts[x] from disjuncts[i]
 						disjuncts[i].erase(disjuncts[i].begin() + idx);
-						
-
 					}
 				}
-
 				if (disjuncts[i].size() == 0)//if length of d is 0
 				{
 					cout << "CONTRADICTION" << endl;
-					return Puzzle();
+					puzzle.status = CONTRADICTION;
+					puzzle.evidence = facts;
+					puzzle.disjunction = disjuncts;
+					return puzzle;
 				}
 			}
-			
-
-
 			//for all disjunct d in A
 			for (int i = 0; i < disjuncts.size(); i++)
 			{
 				if (disjuncts[i].size() == 1)
 				{
 					//remove this disjunct from A and add it to new (unless d already in B)
-					
 					if (vecContainsCell(facts, disjuncts[i][0]) == -1) //does not contain already
 					{
 						if (vecContainsCell(newVec, disjuncts[i][0]) == -1) //newvec shouldnt have it either!
 						{
-							cout << "ADDING TO NEW: " << disjuncts[i][0] << endl;
 							newVec.push_back(disjuncts[i][0]);//only one elem
-							//	i = 0;
 						}
 					}
 					disjuncts.erase(disjuncts.begin() + i);
 					i--;
 				}
 			}//end for
-
-
 		}//end old for
+
 		if (newVec.size() == 0)
 		{
 			cout << "UNSOLVED" << endl;
-			return Puzzle(); //UNSOLVED
+			puzzle.status = UNSOLVED;
+			puzzle.evidence = facts;
+			puzzle.disjunction = disjuncts;
+			return puzzle; //UNSOLVED
 		}
 		facts.insert(facts.end(), newVec.begin(), newVec.end());//add new to B
 		oldVec = newVec;//set old = new
 		//return Puzzle();
 	}//end while
-	cout << "SOLVED" << endl;
-
+	if (facts.size() == nSquared)
+	{
+		cout << "SOLVED" << endl;
+		puzzle.status = SOLVED;
+	}
+	else
+		cout << "CLOSE! but no" << endl;
 	puzzle.evidence = facts;
+	puzzle.disjunction = disjuncts;
 	return puzzle;
 }
 
+//same as problem 1, but doesn't keep making the chains on initialization
+Puzzle resolveStrimkoTwo(Puzzle &puzzle, int nSquared, int n, vector<vector<Cell> > chains) {
+	vector<vector<Cell> > disjuncts = puzzle.disjunction; //A
+	vector<Cell>  facts = puzzle.evidence; //B
+
+	//initialize old with initial facts
+	vector<Cell> oldVec = vector<Cell>();
+	oldVec = facts;
+	while (facts.size() < nSquared)
+	{
+		vector<Cell> newVec = vector<Cell>();
+		newVec.clear();
+		//for all c in old
+		for (int j = 0; j < oldVec.size(); j++)
+		{
+			vector<Cell> negFacts = vector<Cell>(); //C
+			negFacts.clear();
+
+			negFacts = generateNegFacts(oldVec[j], n, chains);
+			for (int i = 0; i < disjuncts.size(); i++)
+			{
+				//each disjunct[i] that matches a negFact, remove that negFact from disjunct[i]
+				for (int x = 0; x < negFacts.size(); x++)
+				{
+					int idx = vecContainsCell(disjuncts[i], negFacts[x]);
+					if (idx != -1)
+					{
+						disjuncts[i].erase(disjuncts[i].begin() + idx);
+					}
+				}
+
+				if (disjuncts[i].size() == 0)//if length of d is 0
+				{
+					puzzle.status = CONTRADICTION;
+					puzzle.evidence = facts;
+					puzzle.disjunction = disjuncts;
+					return puzzle;
+				}
+			}
+			//for all disjunct d in A
+			for (int i = 0; i < disjuncts.size(); i++)
+			{
+				if (disjuncts[i].size() == 1)
+				{
+					//remove this disjunct from A and add it to new (unless d already in B)
+					if (vecContainsCell(facts, disjuncts[i][0]) == -1) //does not contain already
+					{
+						if (vecContainsCell(newVec, disjuncts[i][0]) == -1) //newvec shouldnt have it either!
+						{
+							newVec.push_back(disjuncts[i][0]);//only one elem
+						}
+					}
+					disjuncts.erase(disjuncts.begin() + i);
+					i--;
+				}
+			}//end for
+		}//end old for
+		if (newVec.size() == 0)
+		{
+			puzzle.status = UNSOLVED;
+			puzzle.evidence = facts;
+			puzzle.disjunction = disjuncts;
+			return puzzle; //UNSOLVED
+		}
+		facts.insert(facts.end(), newVec.begin(), newVec.end());//add new to B
+		oldVec = newVec;//set old = new
+	}//end while
+	if (facts.size() == nSquared)
+	{
+		//cout << "SOLVED" << endl;
+		puzzle.status = SOLVED;
+	}
+	else
+	{
+		cout << "CLOSE! but no: "<< facts.size() << endl;
+		puzzle.status = CONTRADICTION;//I DUNNO
+	}
+
+
+	puzzle.evidence = facts;
+	puzzle.disjunction = disjuncts;
+	return puzzle;
+}
+
+
+vector<Cell> getSmallestDisjunct(Puzzle& puzzle)
+{
+	//return puzzle.disjunction[0];
+	int min = 9999999;
+	int minIdx = 0;
+	for (int i = 0; i < puzzle.disjunction.size(); i++)
+	{
+		int count = 0;
+		int disSize = puzzle.disjunction[i].size();
+		//if none of these disjunctions are facts, they can be valid
+		for (int j = 0; j < puzzle.disjunction[i].size(); j++)
+		{
+			if (vecContainsCell(puzzle.evidence, puzzle.disjunction[i][j]) == -1)
+				count++;
+		}
+		if (disSize == 0 || disSize == 1)//REMOVE CONTRA?
+		{
+			puzzle.disjunction.erase(puzzle.disjunction.begin() + i);
+			i--;
+		}
+		else if (count == disSize)//IF THIS ONE DOESNT HAVE EVIDENCE IN IT
+		{
+			//return puzzle.disjunction[i];
+			if (puzzle.disjunction[i].size() < min)// && puzzle.disjunction[i].size() != 0)//HERE HERETODO TODO <
+			{
+				min = puzzle.disjunction[i].size();
+				minIdx = i;
+			}
+		}
+	}
+	return puzzle.disjunction[minIdx];
+}
+Cell newGuess(Puzzle& puzzle, vector<Cell>& oldGuesses)
+{
+	string reason = "N";
+	vector<Cell> smallestD = getSmallestDisjunct(puzzle);
+	for (int i = 0; i < smallestD.size(); i++)
+	{
+		reason = "in Oldguess ";
+		if (vecContainsCell(oldGuesses, smallestD[i]) == -1)
+		{
+			reason = "in Evidence"; 
+			///if (vecContainsCell(puzzle.evidence, smallestD[i]) == -1)
+			///{
+				reason = "B";
+				//add this guess to list of guesses
+				oldGuesses.push_back(smallestD[i]);
+				//cout << "GUESSING" << smallestD[i];
+				return smallestD[i];
+			///}
+		}
+		//cout << reason <<" " << oldGuesses.size()<<  endl;
+	}
+	cout << "BADNEWGUESS : " << reason<<" "<< smallestD.size() << endl;
+	return Cell();
+}
 // This is for Problem 2
 Puzzle solveStrimko(Puzzle &puzzle) {
+
+	std::map<int, vector<Cell> > guessMap; 
+	int nSquared = puzzle.disjunction.size() / 4;
+	int n = sqrt(nSquared);
+	//we need to get chain locations from last n disjuncts in disjuncts
+	vector<vector<Cell> > chains = vector<vector<Cell> >();
+	for (int i = puzzle.disjunction.size() - 1; i > puzzle.disjunction.size() - n - 1; i--)
+	{
+		chains.push_back(puzzle.disjunction[i]);
+		//for each cell in this chain, update its chain number to i, later
+	}
+	
+	int depth = 0;
+
+	std::map<int, Puzzle> puzzleMap = map<int, Puzzle>();
+
+	while (puzzle.status != SOLVED)
+	{
+		puzzle = resolveStrimkoTwo(puzzle, nSquared, n, chains);
+		if (puzzle.status == SOLVED)
+		{
+			cout << "****** SOLUTION FOUND ******" << endl;
+			return puzzle;
+		}
+		else if (puzzle.status == UNSOLVED)
+		{
+			//cout << "Guessing level: "<< depth << endl;
+			depth++;
+			vector<Cell> newGuessVec; //a vector with one element, the newGuess, to be pushed into disjunction
+			newGuessVec.clear();
+			newGuessVec.push_back(newGuess(puzzle, guessMap[depth]));
+			puzzleMap[depth] = puzzle; //oldPuzzle with newGuess
+			puzzle.disjunction.push_back(newGuessVec);
+		}
+		else if (puzzle.status == CONTRADICTION)
+		{
+			//cout << "CONTRADICTION_RESOLVE: depth="<< depth << endl;
+			int gMapSize = guessMap[depth].size();
+			int smallDSize = getSmallestDisjunct(puzzle).size(); //PROBLEM HERE
+			puzzle = puzzleMap[depth];//WAS above if gmap statement
+
+			//else
+			//{
+				vector<Cell> newGuessVec; //a vector with one element, the newGuess, to be pushed into disjunction
+				newGuessVec.push_back(newGuess(puzzle, guessMap[depth]));
+				puzzle.disjunction.push_back(newGuessVec); //puzzle + newGuess
+			//}
+		}
+	}
+
+	cout << "ERROR, BAD ERROR!" << endl;
 	return Puzzle();
 }
 
@@ -331,7 +549,7 @@ int main(int argc, char**argv) {
 			cout << "Error while loading the puzzle file..." << endl;
 			return 1;
 		}
-		cout << "Puzzle is loaded from " << inputName << endl;	
+		cout << "Puzzle is loaded from " << inputName << " ";	
 		Puzzle solution;
 		
 		switch (argv[1][0]){
@@ -354,7 +572,7 @@ int main(int argc, char**argv) {
 			cout << "Error while saving the results..." << endl;
 			return 1;
 		}
-		cout << "Solution is saved in " << outputName << endl;	
+		//cout << "Solution is saved in " << outputName << endl;	
 	}
 	return 0;
 }
